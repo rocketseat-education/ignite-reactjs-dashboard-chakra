@@ -1,7 +1,11 @@
 import { Box, Flex, SimpleGrid, Text, theme } from "@chakra-ui/react";
 import dynamic from 'next/dynamic';
+import { useEffect } from "react";
 import { Header } from "../components/Header";
 import { Sidebar } from "../components/Sidebar";
+import { setupAuthClient } from "../services/auth";
+import nookies from 'nookies'
+import { GetServerSideProps } from "next";
 
 const Chart = dynamic(() => import('react-apexcharts'), {
   ssr: false,
@@ -60,6 +64,16 @@ const series = [
 ]
 
 export default function Dashboard() {
+  useEffect(() => {
+    const auth = setupAuthClient();
+
+    auth.get('/me').then(response => console.log(response.data));
+    auth.get('/me').then(response => console.log(response.data));
+    auth.get('/me').then(response => console.log(response.data));
+    auth.get('/me').then(response => console.log(response.data));
+    auth.get('/me').then(response => console.log(response.data));
+  }, [])
+
   return (
     <Flex direction="column" h="100vh">
       <Header />
@@ -90,4 +104,14 @@ export default function Dashboard() {
       </Flex>
     </Flex>
   )
+}
+
+export const getServerSideProps: GetServerSideProps = async (ctx) => {
+  const auth = setupAuthClient(ctx)
+
+  await auth.get('/me').then(response => console.log(response.data));
+
+  return {
+    props: {}
+  }
 }
