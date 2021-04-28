@@ -1,94 +1,89 @@
 import { createContext, useState, useContext, useEffect } from 'react';
-import { setupAuthClient } from '../services/auth';
-import nookies from 'nookies'
 import Router from 'next/router';
+import { setCookie, destroyCookie, parseCookies } from 'nookies'
+import { authClient } from '../services/authClient';
 
-interface User {
-  email: string;
+export type User = {
+  email: string; 
   permissions: string[];
   roles: string[];
 }
 
-interface SignInCredentials {
+type SignInCredentials = {
   email: string;
   password: string;
 }
 
-interface AuthContextData {
+type AuthContextData = {
   signIn(credentials: SignInCredentials): Promise<void>;
   signOut(): void;
   user: User;
   isAuthenticated: boolean;
-  isAuthLoaded: boolean;
 }
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
 
 export function signOut() {
-  nookies.destroy(null, 'DashGo.token');
-  nookies.destroy(null, 'DashGo.refreshToken');
+  destroyCookie(undefined, 'DashGo.token');
+  destroyCookie(undefined, 'DashGo.refreshToken');
 
   Router.push('/');
 }
 
-const auth = setupAuthClient();
-
 export const AuthProvider: React.FC = ({ children }) => {
   const [user, setUser] = useState<User>();
-  const [isAuthLoaded, setIsAuthLoaded] = useState(false);
 
-  // useEffect(() => {
-  //   const token = Cookie.get('DashGo.token');
+  useEffect(() => {
+    const { 'DashGo.token': token } = parseCookies();
 
-  //   if (token) {
-  //     auth.defaults.headers.authorization = `Bearer ${token}`;
+    if (token) {
+      authClient.get('/me')
+        .then(response => {
+          const { email, permissions, roles } = response.data
 
-  //     auth.get('/me')
-  //       .then(response => {
-  //         const { email, permissions, roles } = response.data
-
-  //         setUser({
-  //           email,
-  //           permissions,
-  //           roles,
-  //         })
-
-  //         setIsAuthLoaded(true);
-  //       }).catch(err => {
-  //         signOut();
-  //       });
-  //   } else {
-  //     setIsAuthLoaded(true);
-  //   }
-  // }, []);
+          setUser({
+            email,
+            permissions,
+            roles,
+          })
+        })
+        .catch(() => {
+          signOut();
+        });
+    }
+  }, []);
 
   async function signIn({ email, password }) {
-    const response = await auth.post('sessions', {
+    const response = await authClient.post('sessions', {
       email,
       password,
     });
 
     const { token, refreshToken, permissions, roles } = response.data;
 
-    nookies.set(null, 'DashGo.token', token, {
+    setCookie(undefined, 'DashGo.token', token, {
       maxAge: 60 * 60 * 24, // 1 day
+      path: '/'
     });
 
-    nookies.set(null, 'DashGo.refreshToken', refreshToken, {
+    setCookie(undefined, 'DashGo.refreshToken', refreshToken, {
       maxAge: 60 * 60 * 24 * 15, // 15 days
+      path: '/'
     });
 
-    auth.defaults.headers.authorization = `Bearer ${token}`;
+    authClient.defaults.headers['Authorization'] = `Bearer ${token}`;
 
     setUser({
       email,
       permissions,
       roles
     })
+
+    await Router.push('/dashboard');
   }
 
   return (
-    <AuthContext.Provider value={{ signIn, signOut, user, isAuthLoaded, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ signIn, signOut, user, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );

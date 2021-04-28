@@ -1,4 +1,5 @@
 import { AppProps } from 'next/app'
+import { GetServerSidePropsContext } from 'next'
 import { ChakraProvider } from '@chakra-ui/react'
 import { ReactQueryDevtools } from 'react-query/devtools'
 import { Provider as NextAuthProvider } from 'next-auth/client'

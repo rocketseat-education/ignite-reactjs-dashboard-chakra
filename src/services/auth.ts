@@ -1,13 +1,14 @@
-import nookies from 'nookies';
+import { parseCookies, setCookie } from 'nookies';
 import axios, { AxiosError } from 'axios'
 
 import { signOut } from '../contexts/AuthContext';
+import { RefreshTokenError } from './errors/RefreshTokenError';
 
 let isRefreshing = false;
 let failedRequestsQueue = [];
 
 export function setupAuthClient(ctx: any = null) {
-  const cookies = nookies.get(ctx);
+  let cookies = parseCookies(ctx);
 
   const auth = axios.create({
     baseURL: 'http://localhost:3333',
@@ -21,6 +22,8 @@ export function setupAuthClient(ctx: any = null) {
   }, (error: AxiosError) => {
     if (error.response.status === 401) {
       if (error.response.data?.code === 'token.expired') {
+        cookies = parseCookies(ctx);
+
         const refreshToken = cookies['DashGo.refreshToken']
   
         const { config: originalConfig } = error
@@ -33,23 +36,27 @@ export function setupAuthClient(ctx: any = null) {
           }).then(response => {
             const token = response.data.token;
   
-            nookies.set(ctx, 'DashGo.token', token, {
+            setCookie(ctx, 'DashGo.token', token, {
               maxAge: 60 * 60 * 24, // 1 day
+              path: '/'
             });
         
-            nookies.set(ctx, 'DashGo.refreshToken', response.data.refreshToken, {
+            setCookie(ctx, 'DashGo.refreshToken', response.data.refreshToken, {
               maxAge: 60 * 60 * 24 * 15, // 15 days
+              path: '/'
             });
-  
+
             auth.defaults.headers['Authorization'] = `Bearer ${token}`;
   
             failedRequestsQueue.forEach((v) => v.resolve(token))
             failedRequestsQueue = []
           }).catch(err => {
-            failedRequestsQueue.forEach((v) => v.reject(err))
+            failedRequestsQueue.forEach((v) => v.reject(new RefreshTokenError()))
             failedRequestsQueue = []
   
-            signOut()
+            if (process.browser) {
+              signOut()
+            }
           }).finally(() => {
             isRefreshing = false
           })
@@ -68,7 +75,11 @@ export function setupAuthClient(ctx: any = null) {
           })
         })
       } else {
-        signOut();
+        if (process.browser) {
+          signOut()
+        } else {
+          return Promise.reject(new RefreshTokenError());
+        }
       }
     }
   

@@ -27,6 +27,7 @@
     "react-hook-form": "^7.0.1",
     "react-icons": "^4.2.0",
     "react-query": "^3.13.4",
+    "universal-cookie": "^4.0.4",
     "yup": "^0.32.9"
   },
   "devDependencies": {
